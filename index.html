@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In Aeternum Vena: The Severing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white">
+    <div id="game-container" class="container mx-auto p-4 h-screen">
+        <div id="start-screen" class="flex flex-col items-center justify-center h-full">
+            <h1 class="text-6xl mb-8 text-center">In Aeternum Vena:<br>The Severing</h1>
+            <button id="start-button" class="bg-red-500 hover:bg-red-700 text-white font-bold py-3 px-6 rounded text-xl">
+                Start Game
+            </button>
+        </div>
+        <div id="game-screen" class="hidden">
+            <div class="flex">
+                <div class="w-1/4 pr-4">
+                    <div id="player-stats" class="mb-4">
+                        <h2 class="text-2xl mb-2">Character Sheet</h2>
+                        <div>HP: <span id="player-hp">100</span></div>
+                        <div>VP: <span id="player-vp">3</span></div>
+                        <div>Level: <span id="player-level">1</span></div>
+                        <div>XP: <span id="player-xp">0</span></div>
+                        <div class="mt-4">Screen: <span id="current-screen">(4, 4)</span></div>
+                        <div>Region: <span id="current-region">Centrium Square</span></div>
+                    </div>
+                    <div id="use-inventory-container">
+                        <h2 class="text-2xl mb-2">Use Items</h2>
+                        <div id="use-inventory" class="bg-gray-800 p-2 rounded">
+                            <!-- Use items will be dynamically added here -->
+                        </div>
+                    </div>
+                    <button id="inv-button" class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        INV
+                    </button>
+                </div>
+                <div class="w-3/4">
+                    <div id="game-map" class="grid gap-1 mb-4">
+                        <!-- Game map will be dynamically generated here -->
+                    </div>
+                    <div id="controls" class="flex justify-center mt-4">
+                        <div class="grid grid-cols-3 gap-2">
+                            <div></div>
+                            <button data-direction="up" class="game-button">↑</button>
+                            <div></div>
+                            <button data-direction="left" class="game-button">←</button>
+                            <button data-direction="down" class="game-button">↓</button>
+                            <button data-direction="right" class="game-button">→</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="action-log" class="h-40 overflow-y-auto bg-gray-800 p-2 rounded mt-4">
+                <!-- Action log will be updated here -->
+            </div>
+        </div>
+        <div id="full-inventory-screen" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center">
+            <div class="bg-gray-800 p-4 rounded max-w-md w-full">
+                <h2 class="text-2xl mb-4">Full Inventory</h2>
+                <div id="full-inventory">
+                    <!-- Full inventory will be dynamically added here -->
+                </div>
+                <button id="close-inventory" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" onclick="toggleFullInventory()">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="game-map.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
