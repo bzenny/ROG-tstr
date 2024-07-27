@@ -1,353 +1,544 @@
-// Game state
-let gameWorld = [];
-let currentScreen = { x: 4, y: 4 }; // Start in the middle of the 9x9 world
-let playerPos = { x: 10, y: 10 };
-let playerStats = { hp: 100, vp: 3, level: 1, xp: 0 };
-let inventory = {
-    use: {},
-    eq: {},
-    spec: {}
-};
-let equippedItems = {
-    weapon: null,
-    armor: null,
-    accessory: null
-};
-
-const ITEMS = {
-    use: {
-        dOrb: { name: "D-Orb", effect: () => gainXP(20), rarity: 0.05 },
-        redVile: { name: "Red Vile", effect: () => { playerStats.hp = Math.min(playerStats.hp + 10, 100); }, rarity: 0.4 },
-        bgRdVile: { name: "BgRdVile", effect: () => { playerStats.hp = Math.min(playerStats.hp + 20, 100); }, rarity: 0.1 },
-        blueVile: { name: "Blue Vile", effect: () => { playerStats.vp += 3; }, rarity: 0.4 },
-        bgBluVile: { name: "BgBluVile", effect: () => { playerStats.vp += 7; }, rarity: 0.05 }
-    },
-    eq: {
-        rapier: { name: "Rapier", effect: "Attack +5", type: "weapon", rarity: 0.2 },
-        brdSward: { name: "Brd Sward", effect: "Attack +10", type: "weapon", rarity: 0.1 },
-        mace: { name: "Mace", effect: "Attack +7", type: "weapon", rarity: 0.15 },
-        dCloak: { name: "D-Cloak", effect: "Defense +5", type: "armor", rarity: 0.1 },
-        fancyBoots: { name: "Fancy Boots", effect: "Speed +3", type: "armor", rarity: 0.15 },
-        charm: { name: "Charm", effect: "Luck +2", type: "accessory", rarity: 0.1 }
-    },
-    spec: {
-        redCrown: { name: "Red Crown", effect: "Opens specific doors", rarity: 0.05 },
-        makersKey: { name: "Makers Key", effect: "Unlocks certain chests", rarity: 0.05 }
+// game-map.js
+class GameMap {
+    constructor() {
+        this.screenWidth = 20;
+        this.screenHeight = 20;
+        this.worldWidth = 9;
+        this.worldHeight = 9;
+        this.currentScreen = { x: 4, y: 4 }; // Start in Centrium Square
+        this.tiles = [];
+        this.regions = [
+            ['Nortland', 'Vena Cava Mnts', 'High Serpent Rvr'],
+            ['Centrium Coast', 'Centrium Square', 'Easterlan'],
+            ['Ahteyn', 'Share Farms', 'Southestra']
+        ];
+        this.terrainTypes = {
+            '.': { name: 'Empty', passable: true },
+            '~': { name: 'Water', passable: true, message: 'You are wet!' },
+            'r': { name: 'River', passable: false, message: 'You need a boat to cross the river.' },
+            'S': { name: 'Sea', passable: false, message: 'The sea is too vast to cross.' },
+            '^': { name: 'Mountain', passable: false, message: 'The mountain is too steep to climb.' },
+            'o': { name: 'Boulder', passable: false, message: 'The boulder blocks your path.' },
+            'd': { name: 'Desert', passable: true, message: 'The desert sand is hot and dry.' },
+            'T': { name: 'Tree', passable: false, message: 'The dense forest blocks your way.' },
+            'R': { name: 'Ruins', passable: true, message: 'Ancient ruins surround you.' },
+        };
+        this.enemies = [];
     }
-};
 
-// Initialize game
-function initGame() {
-    document.getElementById('start-screen').classList.add('hidden');
-    document.getElementById('game-screen').classList.remove('hidden');
-    gameWorld = createWorld();
-    updateMap();
-    updateStats();
-    updateInventory();
+    generate() {
+        for (let y = 0; y < this.worldHeight; y++) {
+            this.tiles[y] = [];
+            for (let x = 0; x < this.worldWidth; x++) {
+                this.tiles[y][x] = this.generateScreen(x, y);
+            }
+        }
+        this.addRivers();
+        this.addBridges();
+    }
+
+    generateScreen(worldX, worldY) {
+        let screen = [];
+        for (let y = 0; y < this.screenHeight; y++) {
+            screen[y] = [];
+            for (let x = 0; x < this.screenWidth; x++) {
+                screen[y][x] = '.';
+            }
+        }
+        this.addRegionalFeatures(screen, worldX, worldY);
+        return screen;
+    }
+
+    addRegionalFeatures(screen, worldX, worldY) {
+        const region = this.getRegion(worldX, worldY);
+        const features = {
+            'Nortland': ['T', '^', 'o'],
+            'Vena Cava Mnts': ['^', 'o', 'R'],
+            'High Serpent Rvr': ['r', '~', 'T'],
+            'Centrium Coast': ['S', '~', 'T'],
+            'Centrium Square': ['R', '.', 'T'],
+            'Easterlan': ['T', 'R', '~'],
+            'Ahteyn': ['R', 'd', 'o'],
+            'Share Farms': ['T', '.', '~'],
+            'Southestra': ['d', 'T', 'R']
+        };
+        const regionFeatures = features[region] || ['.', 'T', '~'];
+        for (let i = 0; i < Math.floor(this.screenWidth * this.screenHeight * 0.2); i++) {
+            const x = Math.floor(Math.random() * this.screenWidth);
+            const y = Math.floor(Math.random() * this.screenHeight);
+            screen[y][x] = regionFeatures[Math.floor(Math.random() * regionFeatures.length)];
+        }
+    }
+
+    addRivers() {
+        // Add horizontal river
+        for (let x = 0; x < this.worldWidth; x++) {
+            this.fillScreenBorder(this.tiles[1][x], 'bottom', 'r');
+            this.fillScreenBorder(this.tiles[2][x], 'top', 'r');
+        }
+        // Add vertical river
+        for (let y = 0; y < this.worldHeight; y++) {
+            this.fillScreenBorder(this.tiles[y][2], 'right', 'r');
+            this.fillScreenBorder(this.tiles[y][3], 'left', 'r');
+        }
+    }
+
+    addBridges() {
+        // Add bridge to Easterlan (blocked initially)
+        this.tiles[1][4][this.screenHeight - 1][Math.floor(this.screenWidth / 2)] = '=';
+        // Add portway to Nortland (blocked initially)
+        this.tiles[3][4][0][Math.floor(this.screenWidth / 2)] = 'P';
+    }
+
+    fillScreenBorder(screen, side, tile) {
+        switch(side) {
+            case 'top':
+                for (let x = 0; x < this.screenWidth; x++) screen[0][x] = tile;
+                break;
+            case 'bottom':
+                for (let x = 0; x < this.screenWidth; x++) screen[this.screenHeight - 1][x] = tile;
+                break;
+            case 'left':
+                for (let y = 0; y < this.screenHeight; y++) screen[y][0] = tile;
+                break;
+            case 'right':
+                for (let y = 0; y < this.screenHeight; y++) screen[y][this.screenWidth - 1] = tile;
+                break;
+        }
+    }
+
+    getRegion(x, y) {
+        return this.regions[Math.floor(y / 3)][Math.floor(x / 3)];
+    }
+
+    getTile(x, y) {
+        return this.tiles[this.currentScreen.y][this.currentScreen.x][y][x];
+    }
+
+    isPassable(x, y) {
+        const tile = this.getTile(x, y);
+        return this.terrainTypes[tile].passable;
+    }
+
+    getTerrainMessage(x, y) {
+        const tile = this.getTile(x, y);
+        return this.terrainTypes[tile].message;
+    }
+
+    spawnEnemies() {
+        const numEnemies = 3; // Adjust as needed
+        for (let i = 0; i < numEnemies; i++) {
+            let x, y;
+            do {
+                x = Math.floor(Math.random() * this.screenWidth);
+                y = Math.floor(Math.random() * this.screenHeight);
+            } while (!this.isPassable(x, y));
+            this.enemies.push({
+                x: x,
+                y: y,
+                type: 'basic',
+                symbol: 'E',
+                hp: 20
+            });
+        }
+    }
+
+    updateEnemies() {
+        for (let enemy of this.enemies) {
+            // Basic AI: move randomly
+            const dx = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+            const dy = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+            if (this.isPassable(enemy.x + dx, enemy.y + dy)) {
+                enemy.x += dx;
+                enemy.y += dy;
+            }
+        }
+    }
+
+    getEnemyAt(x, y) {
+        return this.enemies.find(enemy => enemy.x === x && enemy.y === y);
+    }
+
+    removeEnemy(enemy) {
+        const index = this.enemies.indexOf(enemy);
+        if (index > -1) {
+            this.enemies.splice(index, 1);
+        }
+    }
 }
 
-// Update game map display
-function updateMap() {
+// game.js
+
+const gameState = {
+    player: {
+        x: 10,
+        y: 10,
+        symbol: 'Æ',
+        hp: 100,
+        vp: 3,
+        level: 1,
+        abilities: {
+            bloodlust: {
+                name: "Bloodlust",
+                vpCostPercentage: 75,
+                availableThisScreen: true
+            }
+        }
+    },
+    gameMap: new GameMap(),
+    currentScreen: { x: 4, y: 4 }, // Start in Centrium Square
+    gameMode: 'exterminator',
+    quests: [],
+    completedQuests: []
+};
+
+function initGame() {
+    showStartScreen();
+    setupEventListeners();
+}
+
+function showStartScreen() {
+    document.getElementById('start-screen').classList.remove('hidden');
+    document.getElementById('game-container').classList.add('hidden');
+}
+
+function hideStartScreen() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-container').classList.remove('hidden');
+}
+
+function showGameOverScreen() {
+    document.getElementById('game-over-screen').classList.remove('hidden');
+    document.getElementById('game-container').classList.add('hidden');
+}
+
+function startGame() {
+    hideStartScreen();
+    gameState.gameMap.generate();
+    gameState.gameMap.spawnEnemies();
+    addQuest(exampleQuest);
+    renderMap();
+    updatePlayerStats();
+    updateQuestLog();
+}
+
+function setupEventListeners() {
+    document.getElementById('choose-ae').addEventListener('click', () => {
+        gameState.player.symbol = 'Æ';
+        document.getElementById('choose-ae').classList.add('selected');
+        document.getElementById('choose-eth').classList.remove('selected');
+    });
+    document.getElementById('choose-eth').addEventListener('click', () => {
+        gameState.player.symbol = 'Ð';
+        document.getElementById('choose-eth').classList.add('selected');
+        document.getElementById('choose-ae').classList.remove('selected');
+    });
+    document.getElementById('exterminator-mode').addEventListener('click', () => {
+        gameState.gameMode = 'exterminator';
+        document.getElementById('exterminator-mode').classList.add('selected');
+        document.getElementById('wanderer-mode').classList.remove('selected');
+    });
+    document.getElementById('wanderer-mode').addEventListener('click', () => {
+        gameState.gameMode = 'wanderer';
+        document.getElementById('wanderer-mode').classList.add('selected');
+        document.getElementById('exterminator-mode').classList.remove('selected');
+    });
+    document.getElementById('start-game').addEventListener('click', startGame);
+    document.getElementById('restart-game').addEventListener('click', restartGame);
+    document.getElementById('controls').addEventListener('click', handleControlClick);
+    document.addEventListener('keydown', handleKeyPress);
+    document.getElementById('bloodlust-btn').addEventListener('click', () => useAbility('bloodlust'));
+}
+
+function handleControlClick(e) {
+    if (e.target.tagName === 'BUTTON') {
+        const direction = e.target.textContent;
+        switch (direction) {
+            case '↖': movePlayer(-1, -1); break;
+            case '↑': movePlayer(0, -1); break;
+            case '↗': movePlayer(1, -1); break;
+            case '←': movePlayer(-1, 0); break;
+            case '→': movePlayer(1, 0); break;
+            case '↙': movePlayer(-1, 1); break;
+            case '↓': movePlayer(0, 1); break;
+            case '↘': movePlayer(1, 1); break;
+            case 'Æ': searchArea(); break;
+        }
+    }
+}
+
+function handleKeyPress(e) {
+    switch (e.key) {
+        case 'ArrowUp': movePlayer(0, -1); break;
+        case 'ArrowDown': movePlayer(0, 1); break;
+        case 'ArrowLeft': movePlayer(-1, 0); break;
+        case 'ArrowRight': movePlayer(1, 0); break;
+        case ' ': searchArea(); break;
+    }
+}
+
+function restartGame() {
+    gameState.player.hp = 100;
+    gameState.player.vp = 3;
+    gameState.player.x = 10;
+    gameState.player.y = 10;
+    gameState.currentScreen = { x: 4, y: 4 };
+    gameState.quests = [];
+    gameState.completedQuests = [];
+    document.getElementById('game-over-screen').classList.add('hidden');
+    startGame();
+}
+
+function checkGameOver() {
+    if (gameState.player.hp <= 0) {
+        showGameOverScreen();
+    }
+}
+
+function movePlayer(dx, dy) {
+    const newX = gameState.player.x + dx;
+    const newY = gameState.player.y + dy;
+
+    if (gameState.gameMap.isPassable(newX, newY)) {
+        const enemy = gameState.gameMap.getEnemyAt(newX, newY);
+        if (enemy) {
+            attackEnemy(enemy);
+        } else {
+            gameState.player.x = newX;
+            gameState.player.y = newY;
+            const message = gameState.gameMap.getTerrainMessage(newX, newY);
+            if (message) {
+                updateActionLog(message);
+            }
+            if (gameState.gameMode === 'exterminator') {
+                gameState.player.hp -= 2;
+            } else {
+                gameState.player.hp -= 1;
+            }
+            gameState.gameMap.updateEnemies();
+            checkGameOver();
+            updatePlayerStats();
+            renderMap();
+        }
+
+        // Check if player is moving to a new screen
+        if (newX < 0 || newX >= gameState.gameMap.screenWidth || newY < 0 || newY >= gameState.gameMap.screenHeight) {
+            // Screen transition logic will go here
+            resetAbilityAvailability();
+        }
+    } else {
+        const message = gameState.gameMap.getTerrainMessage(newX, newY);
+        updateActionLog(message || "You can't move there!");
+    }
+}
+
+function attackEnemy(enemy) {
+    const damage = Math.floor(Math.random() * 5) + 1;
+    enemy.hp -= damage;
+    updateActionLog(`You attack the enemy for ${damage} damage!`);
+    if (enemy.hp <= 0) {
+        gameState.gameMap.removeEnemy(enemy);
+        updateActionLog("You defeated the enemy!");
+        for (let quest of gameState.quests) {
+            quest.updateProgress('defeatEnemy');
+        }
+    } else {
+        const enemyDamage = Math.floor(Math.random() * 3) + 1;
+        gameState.player.hp -= enemyDamage;
+        updateActionLog(`The enemy attacks you for ${enemyDamage} damage!`);
+    }
+    updatePlayerStats();
+    checkGameOver();
+}
+
+function searchArea() {
+    updateActionLog('Searched the area. Nothing found.');
+}
+
+function renderMap() {
     const mapElement = document.getElementById('game-map');
     mapElement.innerHTML = '';
-
-    const screen = gameWorld[currentScreen.y][currentScreen.x];
-
-    for (let y = 0; y < SCREEN_SIZE; y++) {
-        for (let x = 0; x < SCREEN_SIZE; x++) {
+    const currentScreen = gameState.gameMap.tiles[gameState.currentScreen.y][gameState.currentScreen.x];
+    for (let y = 0; y < gameState.gameMap.screenHeight; y++) {
+        for (let x = 0; x < gameState.gameMap.screenWidth; x++) {
             const tile = document.createElement('div');
-            tile.classList.add('w-[30px]', 'h-[30px]', 'flex', 'items-center', 'justify-center', 'font-bold', 'rounded');
-            const terrainType = screen[y][x];
-            tile.classList.add(TERRAIN_TYPES[terrainType].color);
-            
-            if (x === playerPos.x && y === playerPos.y) {
-                tile.textContent = 'Æ';
-                tile.classList.remove(TERRAIN_TYPES[terrainType].color);
-                tile.classList.add('bg-red-500', 'text-white');
+            tile.classList.add('game-tile');
+            if (x === gameState.player.x && y === gameState.player.y) {
+                tile.classList.add('player-tile');
+                tile.textContent = gameState.player.symbol;
             } else {
-                tile.textContent = TERRAIN_TYPES[terrainType].label;
+                const enemy = gameState.gameMap.getEnemyAt(x, y);
+                if (enemy) {
+                    tile.classList.add('enemy-tile');
+                    tile.textContent = enemy.symbol;
+                } else {
+                    const terrainType = currentScreen[y][x];
+                    tile.classList.add(`${gameState.gameMap.terrainTypes[terrainType].name.toLowerCase()}-tile`);
+                    tile.textContent = terrainType;
+                }
             }
-
             mapElement.appendChild(tile);
         }
     }
 }
 
-// Update player stats display
-function updateStats() {
-    document.getElementById('player-hp').textContent = playerStats.hp;
-    document.getElementById('player-vp').textContent = playerStats.vp;
-    document.getElementById('player-level').textContent = playerStats.level;
-    document.getElementById('player-xp').textContent = playerStats.xp;
-    document.getElementById('current-screen').textContent = `(${currentScreen.x}, ${currentScreen.y})`;
-    document.getElementById('current-region').textContent = getRegionName(currentScreen.x, currentScreen.y);
+function updatePlayerStats() {
+    document.getElementById('player-hp').textContent = gameState.player.hp;
+    document.getElementById('player-vp').textContent = gameState.player.vp;
+    document.getElementById('player-level').textContent = gameState.player.level;
     
-    // Display equipped items
-    document.getElementById('equipped-weapon').textContent = equippedItems.weapon ? ITEMS.eq[equippedItems.weapon].name : "None";
-    document.getElementById('equipped-armor').textContent = equippedItems.armor ? ITEMS.eq[equippedItems.armor].name : "None";
-    document.getElementById('equipped-accessory').textContent = equippedItems.accessory ? ITEMS.eq[equippedItems.accessory].name : "None";
-}
-
-// Update inventory display
-function updateInventory() {
-    const useInventoryElement = document.getElementById('use-inventory');
-    useInventoryElement.innerHTML = '';
-    for (let itemKey in inventory.use) {
-        const item = ITEMS.use[itemKey];
-        const count = inventory.use[itemKey];
-        if (count > 0) {
-            const itemElement = document.createElement('div');
-            itemElement.textContent = `${item.name} (x${count})`;
-            itemElement.classList.add('cursor-pointer', 'hover:bg-gray-700', 'p-1');
-            itemElement.onclick = () => useItem('use', itemKey);
-            useInventoryElement.appendChild(itemElement);
-        }
+    const bloodlustBtn = document.getElementById('bloodlust-btn');
+    if (gameState.player.abilities.bloodlust.availableThisScreen) {
+        bloodlustBtn.disabled = false;
+        bloodlustBtn.textContent = "Bloodlust";
+    } else {
+        bloodlustBtn.disabled = true;
+        bloodlustBtn.textContent = "Bloodlust (Used)";
     }
 }
 
-// Update full inventory display
-function updateFullInventory() {
-    const fullInventoryElement = document.getElementById('full-inventory');
-    fullInventoryElement.innerHTML = '';
-    
-    ['eq', 'spec'].forEach(category => {
-        const categoryElement = document.createElement('div');
-        categoryElement.innerHTML = `<h3 class="text-xl mt-2">${category.toUpperCase()}</h3>`;
-        for (let itemKey in inventory[category]) {
-            const item = ITEMS[category][itemKey];
-            const count = inventory[category][itemKey];
-            if (count > 0) {
-                const itemElement = document.createElement('div');
-                itemElement.textContent = `${item.name} (x${count})`;
-                itemElement.classList.add('cursor-pointer', 'hover:bg-gray-700', 'p-1');
-                itemElement.onclick = () => useItem(category, itemKey);
-                categoryElement.appendChild(itemElement);
-            }
-        }
-        fullInventoryElement.appendChild(categoryElement);
-    });
+function updateActionLog(message) {
+    const logEntries = document.getElementById('log-entries');
+    const entry = document.createElement('p');
+    entry.textContent = message;
+    logEntries.prepend(entry);
+    if (logEntries.children.length > 5) {
+        logEntries.removeChild(logEntries.lastChild);
+    }
 }
 
-// Move player
-function movePlayer(direction) {
-    let newPos = { ...playerPos };
-    let newScreen = { ...currentScreen };
-
-    switch (direction) {
-        case 'up':
-            newPos.y--;
-            if (newPos.y < 0) {
-                newScreen.y--;
-                newPos.y = SCREEN_SIZE - 1;
-            }
-            break;
-        case 'down':
-            newPos.y++;
-            if (newPos.y >= SCREEN_SIZE) {
-                newScreen.y++;
-                newPos.y = 0;
-            }
-            break;
-        case 'left':
-            newPos.x--;
-            if (newPos.x < 0) {
-                newScreen.x--;
-                newPos.x = SCREEN_SIZE - 1;
-            }
-            break;
-        case 'right':
-            newPos.x++;
-            if (newPos.x >= SCREEN_SIZE) {
-                newScreen.x++;
-                newPos.x = 0;
-            }
+function useAbility(abilityName) {
+    switch(abilityName) {
+        case 'bloodlust':
+            bloodlust();
             break;
     }
+    updatePlayerStats();
+}
 
-    // Check world boundaries
-    if (newScreen.x < 0 || newScreen.x >= WORLD_SIZE || newScreen.y < 0 || newScreen.y >= WORLD_SIZE) {
-        addToActionLog("You've reached the edge of the world!");
+function bloodlust() {
+    if (!gameState.player.abilities.bloodlust.availableThisScreen) {
+        updateActionLog("Bloodlust has already been used on this screen.");
         return;
     }
 
-    const newTerrain = gameWorld[newScreen.y][newScreen.x][newPos.y][newPos.x];
-
-    // Check if the new position is impassable
-    if (newTerrain === 'mountain' || newTerrain === 'tree' || newTerrain === 'sea' || newTerrain === 'desert' || newTerrain === 'plateau') {
-        addToActionLog(`Can't move there, it's a ${newTerrain}!`);
+    const vpCost = Math.ceil(gameState.player.vp * (gameState.player.abilities.bloodlust.vpCostPercentage / 100));
+    
+    if (vpCost < 1) {
+        updateActionLog("Not enough VP to use Bloodlust.");
         return;
     }
 
-    // Update player position and current screen
-    playerPos = newPos;
-    if (currentScreen.x !== newScreen.x || currentScreen.y !== newScreen.y) {
-        currentScreen = newScreen;
-        addToActionLog(`Moved to a new screen in ${getRegionName(currentScreen.x, currentScreen.y)}`);
-    } else {
-        addToActionLog(`Moved ${direction}`);
-    }
+    gameState.player.vp -= vpCost;
+    gameState.player.abilities.bloodlust.availableThisScreen = false;
 
-    // Check for water
-    if (newTerrain === 'water') {
-        addToActionLog("You are wet.");
-    }
-
-    // Check for item
-    if (newTerrain === 'item') {
-        collectItem();
-    }
-
-    updateMap();
-    updateStats();
-}
-
-// Collect item
-function collectItem() {
-    const itemCategory = Math.random() < 0.7 ? 'use' : (Math.random() < 0.5 ? 'eq' : 'spec');
-    let randomItemKey;
+    const enemies = gameState.gameMap.enemies;
+    let killedEnemies = 0;
     
-    if (itemCategory === 'use') {
-        randomItemKey = getRandomItemKey(ITEMS.use);
-    } else if (itemCategory === 'eq') {
-        randomItemKey = getRandomEquipmentKey();
-    } else {
-        randomItemKey = getRandomItemKey(ITEMS.spec);
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        enemy.hp -= 12;
+        if (enemy.hp <= 0) {
+            gameState.gameMap.removeEnemy(enemy);
+            killedEnemies++;
+        }
     }
     
-    if (!inventory[itemCategory][randomItemKey]) {
-        inventory[itemCategory][randomItemKey] = 0;
+    updateActionLog(`Bloodlust activated! Dealt 12 damage to all enemies. Used ${vpCost} VP.`);
+    
+    if (killedEnemies > 0) {
+        gameState.player.hp += 15;
+        updateActionLog(`Bloodlust killed ${killedEnemies} enemies. You gained 15 HP!`);
     }
-    inventory[itemCategory][randomItemKey]++;
-
-    const item = ITEMS[itemCategory][randomItemKey];
-    addToActionLog(`You found a ${item.name}!`);
-    gameWorld[currentScreen.y][currentScreen.x][playerPos.y][playerPos.x] = 'empty';
-    updateInventory();
-    if (itemCategory !== 'use') {
-        updateFullInventory();
-    }
+    
+    updatePlayerStats();
+    renderMap();
 }
 
-// Get random item key based on rarity
-function getRandomItemKey(itemCategory) {
-    const roll = Math.random();
-    let cumulativeProbability = 0;
-    for (let itemKey in itemCategory) {
-        cumulativeProbability += itemCategory[itemKey].rarity;
-        if (roll <= cumulativeProbability) {
-            return itemKey;
+function resetAbilityAvailability() {
+    gameState.player.abilities.bloodlust.availableThisScreen = true;
+}
+
+class Quest {
+    constructor(id, title, description, objectives, rewards) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.objectives = objectives;
+        this.rewards = rewards;
+        this.completed = false;
+    }
+
+    updateProgress(action, amount = 1) {
+        if (this.completed) return;
+        
+        let allCompleted = true;
+        for (let objective of this.objectives) {
+            if (objective.action === action) {
+                objective.current += amount;
+                if (objective.current >= objective.target) {
+                    objective.current = objective.target;
+                }
+            }
+            if (objective.current < objective.target) {
+                allCompleted = false;
+            }
+        }
+        
+        if (allCompleted) {
+            this.complete();
         }
     }
-    return Object.keys(itemCategory)[0]; // Fallback to first item if something goes wrong
-}
 
-// Get random equipment key considering equipped items
-function getRandomEquipmentKey() {
-    const roll = Math.random();
-    let cumulativeProbability = 0;
-    let totalProbability = 0;
-
-    // Calculate total probability excluding equipped items
-    for (let itemKey in ITEMS.eq) {
-        if (Object.values(equippedItems).includes(itemKey)) {
-            totalProbability += ITEMS.eq[itemKey].rarity * 0.1; // Reduce probability for equipped items
-        } else {
-            totalProbability += ITEMS.eq[itemKey].rarity;
+    complete() {
+        this.completed = true;
+        updateActionLog(`Quest completed: ${this.title}`);
+        for (let reward of this.rewards) {
+            reward.apply(gameState.player);
         }
+        updateQuestLog();
+        updatePlayerStats();
     }
+}
 
-    for (let itemKey in ITEMS.eq) {
-        let itemProbability = ITEMS.eq[itemKey].rarity;
-        if (Object.values(equippedItems).includes(itemKey)) {
-            itemProbability *= 0.1; // Reduce probability for equipped items
+function addQuest(quest) {
+    gameState.quests.push(quest);
+    updateQuestLog();
+    updateActionLog(`New quest added: ${quest.title}`);
+}
+
+function updateQuestLog() {
+    const questLog = document.getElementById('quest-list');
+    questLog.innerHTML = '';
+    for (let quest of gameState.quests) {
+        const questElement = document.createElement('div');
+        questElement.className = 'quest-item';
+        questElement.innerHTML = `
+            <h3>${quest.title}</h3>
+            <p>${quest.description}</p>
+            <ul>
+                ${quest.objectives.map(obj => `<li>${obj.description}: ${obj.current}/${obj.target}</li>`).join('')}
+            </ul>
+        `;
+        questLog.appendChild(questElement);
+    }
+}
+
+const exampleQuest = new Quest(
+    'quest1',
+    'Exterminator Initiation',
+    'Prove your worth as an exterminator by defeating enemies.',
+    [
+        { action: 'defeatEnemy', target: 5, current: 0, description: 'Defeat enemies' }
+    ],
+    [
+        { 
+            apply: (player) => {
+                player.vp += 2;
+                updateActionLog('Reward: Gained 2 VP');
+            }
         }
-        cumulativeProbability += itemProbability / totalProbability;
-        if (roll <= cumulativeProbability) {
-            return itemKey;
-        }
-    }
-    return Object.keys(ITEMS.eq)[0]; // Fallback to first item if something goes wrong
-}
+    ]
+);
 
-// Use item
-function useItem(category, itemKey) {
-    if (inventory[category][itemKey] > 0) {
-        const item = ITEMS[category][itemKey];
-        if (category === 'use') {
-            item.effect();
-            inventory[category][itemKey]--;
-            addToActionLog(`Used ${item.name}`);
-            updateStats();
-            updateInventory();
-        } else if (category === 'eq') {
-            equipItem(itemKey);
-        } else {
-            addToActionLog(`${item.name}: ${item.effect}`);
-        }
-    }
-}
-
-// Equip item
-function equipItem(itemKey) {
-    const item = ITEMS.eq[itemKey];
-    const oldItem = equippedItems[item.type];
-    equippedItems[item.type] = itemKey;
-    addToActionLog(`Equipped ${item.name}`);
-    if (oldItem) {
-        addToActionLog(`Unequipped ${ITEMS.eq[oldItem].name}`);
-    }
-    updateStats();
-    updateFullInventory();
-}
-
-// Gain XP
-function gainXP(amount) {
-    playerStats.xp += amount;
-    if (playerStats.xp >= 100) {
-        playerStats.level++;
-        playerStats.xp -= 100;
-        addToActionLog(`Level up! You are now level ${playerStats.level}`);
-    }
-    updateStats();
-}
-
-// Add message to action log
-function addToActionLog(message) {
-    const actionLog = document.getElementById('action-log');
-    const logEntry = document.createElement('div');
-    logEntry.textContent = message;
-    actionLog.prepend(logEntry);
-    if (actionLog.children.length > 5) {
-        actionLog.removeChild(actionLog.lastChild);
-    }
-}
-
-// Toggle full inventory
-function toggleFullInventory() {
-    const fullInventoryScreen = document.getElementById('full-inventory-screen');
-    if (fullInventoryScreen.classList.contains('hidden')) {
-        updateFullInventory();
-        fullInventoryScreen.classList.remove('hidden');
-    } else {
-        fullInventoryScreen.classList.add('hidden');
-    }
-}
-
-// Event listeners
-document.getElementById('start-button').addEventListener('click', initGame);
-document.querySelectorAll('.game-button').forEach(button => {
-    button.addEventListener('click', (e) => movePlayer(e.target.dataset.direction));
-});
-document.getElementById('inv-button').addEventListener('click', toggleFullInventory);
-
-// Keyboard controls
-document.addEventListener('keydown', (e) => {
-    if (document.getElementById('game-screen').classList.contains('hidden')) return;
-    switch (e.key) {
-        case 'ArrowUp': case 'w': movePlayer('up'); break;
-        case 'ArrowDown': case 's': movePlayer('down'); break;
-        case 'ArrowLeft': case 'a': movePlayer('left'); break;
-        case 'ArrowRight': case 'd': movePlayer('right'); break;
-        case 'i': toggleFullInventory(); break;
-    }
-});
+window.onload = initGame;
